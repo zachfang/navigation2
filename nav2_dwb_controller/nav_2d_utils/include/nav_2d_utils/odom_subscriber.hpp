@@ -63,7 +63,7 @@ public:
    */
   explicit OdomSubscriber(
     nav2_util::LifecycleNode::SharedPtr & nh,
-    std::string default_topic = "odom")
+    std::string default_topic = "/odometry/filtered")
   {
     std::string odom_topic;
     nh->get_parameter_or("odom_topic", odom_topic, default_topic);
