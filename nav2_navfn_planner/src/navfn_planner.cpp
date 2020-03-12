@@ -203,7 +203,10 @@ NavfnPlanner::makePlan(
   double resolution = costmap_->getResolution();
   geometry_msgs::msg::Pose p, best_pose;
   p = goal;
+  p.position.y = goal.position.y - tolerance;
 
+  // temporarily comment out the original planner
+  /*
   bool found_legal = false;
   double best_sdist = std::numeric_limits<double>::max();
 
@@ -235,6 +238,37 @@ NavfnPlanner::makePlan(
         " potential was found. This shouldn't happen.");
     }
   }
+  */
+
+  // calculate the distance between start and goal points
+  double path_length = sqrt((goal.position.x -  start.position.x) * (goal.position.x -  start.position.x) +
+                            (goal.position.y -  start.position.y) * (goal.position.y -  start.position.y));
+
+  // calculate the number of points between the path
+  size_t number_of_points =  static_cast<size_t>(path_length / resolution);
+  double x_diff = (goal.position.x -  start.position.x) / number_of_points;
+  double y_diff = (goal.position.y -  start.position.y) / number_of_points;
+
+  // constructing global plan
+  plan.header.stamp = node_->now();
+  plan.header.frame_id = global_frame_;
+  for (size_t i = 0; i <number_of_points; i++) {
+
+    geometry_msgs::msg::PoseStamped pose;
+    pose.pose.position.x = start.position.x + i * x_diff;
+    pose.pose.position.y = start.position.y + i * y_diff;
+    pose.pose.position.z = 0.0;
+    pose.pose.orientation.x = 0.0;
+    pose.pose.orientation.y = 0.0;
+    pose.pose.orientation.z = 0.0;
+    pose.pose.orientation.w = 1.0;
+    plan.poses.push_back(pose);
+  }
+
+  // add gola position as the last point in the plan
+  geometry_msgs::msg::PoseStamped goal_copy;
+  goal_copy.pose = goal;
+  plan.poses.push_back(goal_copy);
 
   return !plan.poses.empty();
 }
