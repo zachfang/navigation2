@@ -342,10 +342,18 @@ DWBLocalPlanner::computeVelocityCommands(
   rclcpp::Time current_time = node_->now();
   cmd_vel_pid.header.stamp = current_time;
 
+  nav_2d_msgs::msg::Pose2DStamped goal_pose_robot_frame;
+  if (!nav_2d_utils::transformPose(tf_, "base_footprint", goal_pose,
+    goal_pose_robot_frame, transform_tolerance_))
+  {
+    throw dwb_core::
+          PlannerTFException("Unable to transform robot pose into global plan's frame");
+  }
+
   // calculate difference of distance and angle
-  double distance_diff = sqrt((goal_pose.pose.x - pose.pose.x) * (goal_pose.pose.x - pose.pose.x) +
-                              (goal_pose.pose.y - pose.pose.y) * (goal_pose.pose.y - pose.pose.y));
-  double angle_diff =  atan2((goal_pose.pose.y - pose.pose.y), (goal_pose.pose.x - pose.pose.x));
+  double distance_diff = sqrt(goal_pose_robot_frame.pose.x * goal_pose_robot_frame.pose.x +
+                              goal_pose_robot_frame.pose.y * goal_pose_robot_frame.pose.y);
+  double angle_diff =  atan2(goal_pose_robot_frame.pose.y, goal_pose_robot_frame.pose.x);
 
   // calculate twist by PID
   rclcpp::Duration dt = current_time - last_recv_time_;
