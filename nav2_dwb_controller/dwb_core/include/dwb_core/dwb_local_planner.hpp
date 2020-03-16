@@ -214,6 +214,9 @@ protected:
 
   pluginlib::ClassLoader<TrajectoryCritic> critic_loader_;
   std::vector<TrajectoryCritic::Ptr> critics_;
+
+  std::shared_ptr<control_toolbox::Pid> linear_pid_;
+  std::shared_ptr<control_toolbox::Pid> angular_pid_;
 };
 
 }  // namespace dwb_core

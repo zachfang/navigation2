@@ -38,6 +38,7 @@
 #include <utility>
 #include <vector>
 
+#include <control_toolbox/pid.h>
 #include "dwb_core/dwb_local_planner.hpp"
 #include "dwb_core/exceptions.hpp"
 #include "dwb_core/illegal_trajectory_tracker.hpp"
@@ -112,6 +113,9 @@ void DWBLocalPlanner::configure(
     RCLCPP_ERROR(node_->get_logger(), "Couldn't load critics! Caught exception: %s", e.what());
     throw;
   }
+
+  linear_pid_.reset(new control_toolbox::Pid(1.1, 0.1, 0.1, 0.3, -0.3, true));
+  angular_pid_.reset(new control_toolbox::Pid(1.3, 0.1, 0.5, 0.3, -0.3, true));
 }
 
 void
@@ -332,6 +336,24 @@ DWBLocalPlanner::computeVelocityCommands(
 
   prepareGlobalPlan(pose, transformed_plan, goal_pose);
 
+  nav_2d_msgs::msg::Twist2DStamped cmd_vel_pid;
+  cmd_vel_pid.header.stamp = node_->now();
+
+  // calculate difference of distance and angle
+  double distance_diff = sqrt((goal_pose.pose.x - pose.pose.x) * (goal_pose.pose.x - pose.pose.x) +
+                              (goal_pose.pose.y - pose.pose.y) * (goal_pose.pose.y - pose.pose.y));
+  double angle_diff =  atan2((goal_pose.pose.y - pose.pose.y), (goal_pose.pose.x - pose.pose.x));
+
+  // calculate twist by PID
+  rclcpp::Duration dt(0, 50000000); // assume constant time for testing
+  double linear_velocity = linear_pid_->computeCommand(distance_diff, dt);
+  double angular_velocity = angular_pid_->computeCommand(angle_diff, dt);
+
+  cmd_vel_pid.velocity.x = linear_velocity;
+  cmd_vel_pid.velocity.theta = angular_velocity;
+  RCLCPP_INFO(rclcpp::get_logger("DWBLocalPlanner"), "Distant diff: %f, angular diff: %f", distance_diff, angle_diff);
+  RCLCPP_INFO(rclcpp::get_logger("DWBLocalPlanner"), "PID twist x: %f, theta: %f", linear_velocity, angular_velocity);
+
   for (TrajectoryCritic::Ptr critic : critics_) {
     if (critic->prepare(pose.pose, velocity, goal_pose.pose, transformed_plan) == false) {
       RCLCPP_WARN(rclcpp::get_logger("DWBLocalPlanner"), "A scoring function failed to prepare");
@@ -354,7 +376,7 @@ DWBLocalPlanner::computeVelocityCommands(
     pub_->publishLocalPlan(pose.header, best.traj);
     pub_->publishCostGrid(costmap_ros_, critics_);
 
-    return cmd_vel;
+    return cmd_vel_pid;
   } catch (const dwb_core::NoLegalTrajectoriesException & e) {
     nav_2d_msgs::msg::Twist2D empty_cmd;
     dwb_msgs::msg::Trajectory2D empty_traj;

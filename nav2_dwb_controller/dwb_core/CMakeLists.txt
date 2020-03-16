@@ -17,6 +17,7 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(nav2_core REQUIRED)
+find_package(control_toolbox REQUIRED)
 
 nav2_package()
 
@@ -39,6 +40,7 @@ set(dependencies
   tf2_ros
   nav2_util
   nav2_core
+  control_toolbox
 )
 
 add_library(dwb_core SHARED
