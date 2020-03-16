@@ -217,6 +217,8 @@ protected:
 
   std::shared_ptr<control_toolbox::Pid> linear_pid_;
   std::shared_ptr<control_toolbox::Pid> angular_pid_;
+
+  rclcpp::Time last_recv_time_;
 };
 
 }  // namespace dwb_core

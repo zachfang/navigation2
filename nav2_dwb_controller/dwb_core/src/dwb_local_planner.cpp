@@ -114,8 +114,10 @@ void DWBLocalPlanner::configure(
     throw;
   }
 
-  linear_pid_.reset(new control_toolbox::Pid(1.1, 0.1, 0.1, 0.3, -0.3, true));
-  angular_pid_.reset(new control_toolbox::Pid(1.3, 0.1, 0.5, 0.3, -0.3, true));
+  linear_pid_.reset(new control_toolbox::Pid(0.7, 0.1, 0.1, 0.3, -0.3, true));
+  angular_pid_.reset(new control_toolbox::Pid(1.5, 0.1, 0.5, 0.3, -0.3, true));
+
+  last_recv_time_ = node_->now();
 }
 
 void
@@ -337,7 +339,8 @@ DWBLocalPlanner::computeVelocityCommands(
   prepareGlobalPlan(pose, transformed_plan, goal_pose);
 
   nav_2d_msgs::msg::Twist2DStamped cmd_vel_pid;
-  cmd_vel_pid.header.stamp = node_->now();
+  rclcpp::Time current_time = node_->now();
+  cmd_vel_pid.header.stamp = current_time;
 
   // calculate difference of distance and angle
   double distance_diff = sqrt((goal_pose.pose.x - pose.pose.x) * (goal_pose.pose.x - pose.pose.x) +
@@ -345,15 +348,15 @@ DWBLocalPlanner::computeVelocityCommands(
   double angle_diff =  atan2((goal_pose.pose.y - pose.pose.y), (goal_pose.pose.x - pose.pose.x));
 
   // calculate twist by PID
-  rclcpp::Duration dt(0, 50000000); // assume constant time for testing
+  rclcpp::Duration dt = current_time - last_recv_time_;
   double linear_velocity = linear_pid_->computeCommand(distance_diff, dt);
   double angular_velocity = angular_pid_->computeCommand(angle_diff, dt);
 
   cmd_vel_pid.velocity.x = linear_velocity;
   cmd_vel_pid.velocity.theta = angular_velocity;
-  RCLCPP_INFO(rclcpp::get_logger("DWBLocalPlanner"), "Distant diff: %f, angular diff: %f", distance_diff, angle_diff);
+  RCLCPP_INFO(rclcpp::get_logger("DWBLocalPlanner"), "Distant diff: %f, angular diff: %f, %ld", distance_diff, angle_diff, dt.nanoseconds());
   RCLCPP_INFO(rclcpp::get_logger("DWBLocalPlanner"), "PID twist x: %f, theta: %f", linear_velocity, angular_velocity);
-
+  last_recv_time_ = current_time;
   for (TrajectoryCritic::Ptr critic : critics_) {
     if (critic->prepare(pose.pose, velocity, goal_pose.pose, transformed_plan) == false) {
       RCLCPP_WARN(rclcpp::get_logger("DWBLocalPlanner"), "A scoring function failed to prepare");
